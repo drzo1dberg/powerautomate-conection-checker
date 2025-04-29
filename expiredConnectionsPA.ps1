@@ -35,11 +35,16 @@ try {
     #$clientId = ""
     #$clientSecret = ""
     #$tenantId = ""
-    
-    Add-PowerAppsAccount -ApplicationId $clientId -ClientSecret $clientSecret -TenantId $tenantId
+    #$environmentIds ="'1cca0c87-e9c1-e620-a868-44759825b34b', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'ffffffff-1111-2222-3333-444444444444'"                                              
+ 
+    Add-PowerAppsAccount -ApplicationId $clientId -ClientSecret $clientSecret -TenantId $tenantId 
 
-    # Alle Connections laden
-    $connections = Get-AdminPowerAppConnection -ErrorAction Stop
+    $environmentIds = $environmentIds -split ',' | ForEach-Object { $_.Trim(" '") }   
+
+    # Alle Connections nur für diese Environments laden                    
+    $connections = foreach ($env in $environmentIds) {                     
+        Get-AdminPowerAppConnection -EnvironmentName $env -ErrorAction Stop
+    }                                                                      
 
     # Connections ohne Connected-Status filtern
     $errorList = $connections | Where-Object {
@@ -48,14 +53,23 @@ try {
 
     Write-Host "Total Connections: $($connections.Count)"
     if ($errorList.Count -gt 0) {
-        Write-Host "Connections without Connected status: $($errorList.Count)" -ForegroundColor Red
+        Write-Host "Connections without Connected status: $($errorList.Count)" 
+
+        # Neue Ausgabe: ConnectionName, ConnectorName, EnvironmentName
         foreach ($c in $errorList) {
-           $st = ($c.Statuses | Select-Object -ExpandProperty status) -join ', '
-           Write-Host " - $($c.DisplayName) (Status: $st)" -ForegroundColor Red
+            $st = ($c.Statuses | Select-Object -ExpandProperty status) -join ', '
+            $line = "{0} | {1} | {2} | {3} | Status: {4}" -f `
+                $c.DisplayName,
+                $c.ConnectionName,
+                $c.ConnectorName,
+                $c.EnvironmentName,
+                $st
+            Write-Host " - $line" 
         }
+
         exit 1
     } else {
-        Write-Host "All connections are connected" -ForegroundColor Green
+        Write-Host "All connections are connected" 
         exit 0
     }
 }
